@@ -2,8 +2,8 @@ name: 6-Hourly Reel Autopilot
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Runs every 6 hours (00:00, 06:00, 12:00, 18:00)
-  workflow_dispatch:      # Allows manual trigger
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   autopilot:
@@ -35,23 +35,18 @@ jobs:
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
         run: |
           echo "Starting 6-Hourly Autopilot Job..."
-          
-          # Generate 1 local reel
           python3 autoreel.py --add-audio audio --output "temp_reel.mp4"
-          
-          # Find the actual file (it will end in _audio.mp4)
           REAL_FILE=$(ls *temp_reel*_audio.mp4 | head -n 1)
-          
           if [ -f "$REAL_FILE" ]; then
               echo "[+] Found video: $REAL_FILE"
               export LOCAL_REEL="$REAL_FILE"
-              python3 -c "
+              cat << EOF > run_upload.py
 import os
+import sys
 from supabase_helper import upload_to_supabase, delete_from_supabase
 from upload_ig import upload_reel
 from autoreel import get_random_caption
 
-# Update config with env vars
 import upload_ig
 upload_ig.ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
 upload_ig.IG_USER_ID = os.getenv('INSTAGRAM_USER_ID')
@@ -66,19 +61,17 @@ if public_url:
     print(f'[*] Uploading to Instagram...')
     success = upload_reel(public_url, caption)
     
-    # ALWAYS delete from Supabase after Instagram download attempt
     print(f'[*] Cleaning up Supabase...')
     delete_from_supabase(os.path.basename(local_file))
     
-    # Delete local file on GitHub runner
     if os.path.exists(local_file):
         os.remove(local_file)
         print(f'[+] Local file deleted.')
-"
+EOF
+              python3 run_upload.py
           else
               echo "[!] No video file found to upload."
               ls -R
               exit 1
           fi
-          
           echo "Autopilot cycle finished."
