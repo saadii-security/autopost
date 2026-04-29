@@ -198,6 +198,13 @@ DURATION       = 8       # seconds
 FADE_IN        = 0.8
 FADE_OUT       = 0.8
 TOTAL_FRAMES   = DURATION * FPS
+
+# x264: grainy PNG sources + preset "fast" produced ~60MB+ for 8s; Supabase rejects large payloads.
+# Slower preset = better compression at the same CRF (same visual quality, smaller file).
+# CRF 20 + slow is typical for high-quality social vertical video and stays well under storage limits.
+ENCODE_CRF        = 20
+ENCODE_PRESET     = "slow"
+AAC_AUDIO_BITRATE = "128k"
 LINE_SPACING   = 92
 MAX_TEXT_WIDTH = int(WIDTH * 0.78)
 
@@ -411,8 +418,9 @@ def generate_video(quote_text, author, theme, output_path):
         "-i", f"{tmp_dir}/f%05d.png",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
-        "-crf", "18",
-        "-preset", "fast",
+        "-crf", str(ENCODE_CRF),
+        "-preset", ENCODE_PRESET,
+        "-movflags", "+faststart",
         output_path,
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -448,7 +456,7 @@ def merge_audio(video_path, audio_path, output_path, duration=8):
         "-i", audio_path,
         "-i", video_path,
         "-map", "0:a", "-map", "1:v",
-        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", AAC_AUDIO_BITRATE,
         "-af", f"afade=t=out:st={duration-2}:d=2", # Fade out audio at the end
         output_path,
     ]
