@@ -31,6 +31,14 @@ import os, sys, random, shutil, argparse, subprocess
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+# Default matches argparse for --output; demo mode uses a timestamped name only when this is left as default.
+_DEFAULT_OUTPUT = "output_reels/reel.mp4"
+
+
+def _autoreel_debug(msg: str) -> None:
+    if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("AUTOREEL_DEBUG", ""):
+        print(f"[debug autoreel] {msg}", file=sys.stderr)
+
 # ───────────────────────────────────────────────────────
 #  QUOTE BANK  (sunxy.17 style)
 # ───────────────────────────────────────────────────────
@@ -409,7 +417,10 @@ def generate_video(quote_text, author, theme, output_path):
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
-        print("  ffmpeg error:", r.stderr[-400:])
+        err = r.stderr or ""
+        print("  ffmpeg error:", err[-400:] if len(err) > 400 else err)
+        if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("AUTOREEL_DEBUG", ""):
+            print("  ffmpeg (full stderr):\n", err, file=sys.stderr)
     else:
         print(f"  -> {output_path}")
 
@@ -443,7 +454,10 @@ def merge_audio(video_path, audio_path, output_path, duration=8):
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
-        print("  audio error:", r.stderr[-300:])
+        err = r.stderr or ""
+        print("  audio error:", err[-300:] if len(err) > 300 else err)
+        if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("AUTOREEL_DEBUG", ""):
+            print("  ffmpeg merge (full stderr):\n", err, file=sys.stderr)
     else:
         print(f"  -> {output_path}")
 
@@ -457,12 +471,15 @@ def main():
     p.add_argument("--quote",  type=str)
     p.add_argument("--author", type=str, default="unknown")
     p.add_argument("--theme",  choices=["dark", "moody", "warm"], default="dark")
-    p.add_argument("--output", type=str, default="output_reels/reel.mp4")
+    p.add_argument("--output", type=str, default=_DEFAULT_OUTPUT)
     p.add_argument("--batch",  action="store_true")
     p.add_argument("--add-audio", type=str, metavar="AUDIO", help="Path to audio file or directory")
     p.add_argument("--quotes-file", type=str, default="qoutes.txt")
     p.add_argument("--author-default", type=str, default="unknown")
     args = p.parse_args()
+
+    _autoreel_debug(f"argv={sys.argv!r}")
+    _autoreel_debug(f"--output={args.output!r} --add-audio={args.add_audio!r} --quote={'set' if args.quote else None}")
 
     os.makedirs("output_reels", exist_ok=True)
 
@@ -478,6 +495,7 @@ def main():
             audio_file = random.choice(files)
 
     if args.batch:
+        _autoreel_debug("branch=batch")
         print(f"\nBatch: {len(bank)} reels\n")
         for idx, q in enumerate(bank, 1):
             slug = q["text"].split("\n")[0][:25].replace(" ", "_").lower()
@@ -504,6 +522,7 @@ def main():
         print(f"\nDone. Videos in ./output_reels/")
 
     elif args.quote:
+        _autoreel_debug("branch=custom-quote")
         text = args.quote.replace("\\n", "\n")
         print(f'Generating: "{text[:60].replace(chr(10)," ")}"')
         out  = args.output
@@ -522,14 +541,25 @@ def main():
                 os.remove(out)
 
     else:
+        _autoreel_debug("branch=demo-random")
         q   = random.choice(bank)
         import time
         ts = int(time.time())
-        out = f"output_reels/demo_reel_{ts}.mp4"
+        # CI passes --output temp_reel.mp4; honor non-default paths so shell globs match.
+        if args.output != _DEFAULT_OUTPUT:
+            out = args.output
+            if os.path.exists(out):
+                base, ext = os.path.splitext(out)
+                out = f"{base}_{int(time.time())}{ext}"
+            _autoreel_debug(f"using explicit --output -> {out!r}")
+        else:
+            out = f"output_reels/demo_reel_{ts}.mp4"
+            _autoreel_debug(f"default demo path -> {out!r}")
         print(f'Demo: "{q["text"].replace(chr(10)," ")}"')
         generate_video(q["text"], q.get("author", "unknown"), q.get("theme", args.theme), out)
         if audio_file:
             final_out = out.replace(".mp4", "_audio.mp4")
+            _autoreel_debug(f"final video with audio -> {os.path.abspath(final_out)!r}")
             merge_audio(out, audio_file, final_out, duration=DURATION)
             # Remove the silent version
             if os.path.exists(out) and os.path.exists(final_out):

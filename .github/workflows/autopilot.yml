@@ -9,12 +9,17 @@ jobs:
   autopilot:
     runs-on: ubuntu-latest
     
+    env:
+      # Opt into Node 24 for actions; removes deprecation warning (see GitHub changelog 2025-09-19).
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      AUTOREEL_DEBUG: "1"
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -34,16 +39,28 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
         run: |
-          echo "Starting 6-Hourly Autopilot Job..."
+          set -euxo pipefail
+          echo "=== Autopilot: starting (pwd=$(pwd)) ==="
+          echo "=== ffmpeg: $(command -v ffmpeg) $(ffmpeg -version 2>&1 | head -1) ==="
+          echo "=== python: $(command -v python3) ==="
+          python3 -c "import sys; print('=== python version:', sys.version, '===')"
+          echo "=== audio dir listing ==="
+          ls -la audio || true
+          echo "=== Generating reel ==="
           python3 autoreel.py --add-audio audio --output "temp_reel.mp4"
-          REAL_FILE=$(ls *temp_reel*_audio.mp4 | head -n 1)
-          if [ -f "$REAL_FILE" ]; then
+          echo "=== All .mp4 files after autoreel ==="
+          find . -name '*.mp4' -print || true
+          echo "=== Glob *temp_reel*_audio.mp4 ==="
+          ls -la *temp_reel*_audio.mp4 2>&1 || true
+          REAL_FILE=$(ls *temp_reel*_audio.mp4 2>/dev/null | head -n 1 || true)
+          if [ -n "$REAL_FILE" ] && [ -f "$REAL_FILE" ]; then
               echo "[+] Found video: $REAL_FILE"
               export LOCAL_REEL="$REAL_FILE"
+              echo "=== Running upload (LOCAL_REEL=$LOCAL_REEL) ==="
               python3 run_upload.py
           else
-              echo "[!] No video file found to upload."
-              ls -R
+              echo "[!] No video file matched *temp_reel*_audio.mp4 (see [debug autoreel] on stderr above)."
+              ls -laR .
               exit 1
           fi
           echo "Autopilot cycle finished."
