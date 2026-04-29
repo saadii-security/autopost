@@ -3,18 +3,15 @@ import time
 import os
 import sys
 
-# Use environment variables (GitHub Secrets or local .env)
-ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
-IG_USER_ID   = os.getenv("INSTAGRAM_USER_ID")
+ACCESS_TOKEN = (os.getenv("INSTAGRAM_ACCESS_TOKEN") or "").strip().strip('"').strip("'")
+IG_USER_ID   = (os.getenv("INSTAGRAM_USER_ID") or "").strip()
+
+# Debug — prints first/last 6 chars so you can verify in logs
+print(f"[*] Token preview: {ACCESS_TOKEN[:6]}...{ACCESS_TOKEN[-6:]}")
+print(f"[*] Token length: {len(ACCESS_TOKEN)}")
+print(f"[*] User ID: {IG_USER_ID}")
 
 def upload_reel(video_url, caption=""):
-    """
-    Uploads a video from a public URL to Instagram Reels.
-    Flow: 
-    1. Create Media Container (POST /{ig-user-id}/media)
-    2. Wait for completion (GET /{container-id})
-    3. Publish Container (POST /{ig-user-id}/media_publish)
-    """
     
     # 1. Create Container
     print(f"[*] Creating media container for {video_url[:50]}...")
@@ -33,19 +30,15 @@ def upload_reel(video_url, caption=""):
         print(f"[!] Error creating container: {res}")
         err = res.get("error") or {}
         if err.get("code") == 190:
-            print(
-                "[!] OAuth token rejected (code 190). "
-                "Generate a new long-lived User token in Meta Developer tools, "
-                "ensure instagram_basic / instagram_content_publish scopes, "
-                "and update the INSTAGRAM_ACCESS_TOKEN GitHub secret (no quotes or newlines).",
-                file=sys.stderr,
-            )
+            print("[!] OAuth token rejected (code 190).", file=sys.stderr)
+            print(f"[!] Token length was: {len(ACCESS_TOKEN)}", file=sys.stderr)
+            print(f"[!] Token starts with: {ACCESS_TOKEN[:10]}", file=sys.stderr)
         return None
         
     container_id = res['id']
     print(f"[+] Container created: {container_id}")
     
-    # 2. Check Status (Videos need time to be processed by Meta)
+    # 2. Check Status
     print("[*] Waiting for video processing...")
     status_url = f"https://graph.facebook.com/v19.0/{container_id}"
     params = {
@@ -53,7 +46,7 @@ def upload_reel(video_url, caption=""):
         'access_token': ACCESS_TOKEN
     }
     
-    for i in range(30): # Wait up to 5 minutes
+    for i in range(30):
         time.sleep(10)
         sr = requests.get(status_url, params=params)
         sres = sr.json()
@@ -84,12 +77,6 @@ def upload_reel(video_url, caption=""):
         return pres['id']
     else:
         print(f"[!] Publish failed: {pres}")
-        err = pres.get("error") or {}
-        if err.get("code") == 190:
-            print(
-                "[!] OAuth token rejected at publish (code 190). Refresh INSTAGRAM_ACCESS_TOKEN.",
-                file=sys.stderr,
-            )
         return None
 
 if __name__ == "__main__":
