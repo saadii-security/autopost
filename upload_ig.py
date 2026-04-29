@@ -31,6 +31,15 @@ def upload_reel(video_url, caption=""):
     
     if 'id' not in res:
         print(f"[!] Error creating container: {res}")
+        err = res.get("error") or {}
+        if err.get("code") == 190:
+            print(
+                "[!] OAuth token rejected (code 190). "
+                "Generate a new long-lived User token in Meta Developer tools, "
+                "ensure instagram_basic / instagram_content_publish scopes, "
+                "and update the INSTAGRAM_ACCESS_TOKEN GitHub secret (no quotes or newlines).",
+                file=sys.stderr,
+            )
         return None
         
     container_id = res['id']
@@ -75,6 +84,12 @@ def upload_reel(video_url, caption=""):
         return pres['id']
     else:
         print(f"[!] Publish failed: {pres}")
+        err = pres.get("error") or {}
+        if err.get("code") == 190:
+            print(
+                "[!] OAuth token rejected at publish (code 190). Refresh INSTAGRAM_ACCESS_TOKEN.",
+                file=sys.stderr,
+            )
         return None
 
 if __name__ == "__main__":

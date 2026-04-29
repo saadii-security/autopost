@@ -41,15 +41,22 @@ public_url = upload_to_supabase(local_file)
 if public_url:
     print(f"[*] Uploading to Instagram...")
     success = upload_reel(public_url, caption)
-    
+
     # ALWAYS delete from Supabase after Instagram download attempt
     print(f"[*] Cleaning up Supabase...")
     delete_from_supabase(os.path.basename(local_file))
-    
+
     # Delete local file on GitHub runner
     if os.path.exists(local_file):
         os.remove(local_file)
         print(f"[+] Local file deleted.")
+
+    if not success:
+        print(
+            "[!] Instagram Reel was not published. Check run logs above and your token.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 else:
     print("[!] Failed to get public URL from Supabase")
     sys.exit(1)
