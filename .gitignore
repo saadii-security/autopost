@@ -1,0 +1,15 @@
+# Security: Ignore local secrets
+.env
+
+# Ignore temp folders and caches
+.cache/
+/tmp/
+__pycache__/
+
+# Ignore local output videos
+output_reels/
+*.mp4
+*.png
+
+# Ignore system files
+.DS_Store
