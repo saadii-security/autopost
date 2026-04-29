@@ -1,8 +1,8 @@
-name: Hourly Reel Autopilot
+name: 6-Hourly Reel Autopilot
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Runs every hour
+    - cron: '0 */6 * * *'  # Runs every 6 hours (00:00, 06:00, 12:00, 18:00)
   workflow_dispatch:      # Allows manual trigger
 
 jobs:
@@ -27,35 +27,26 @@ jobs:
         run: |
           pip install pillow numpy requests supabase
 
-      - name: Generate and Upload 5 Reels
+      - name: Generate and Upload 1 Reel
         env:
-          # You need to set these in GitHub Repo Settings -> Secrets and variables -> Actions
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
         run: |
-          # 1. Update the credentials in scripts using env vars
-          # (A better way is using os.getenv in the scripts, which I've done below)
+          echo "Starting 6-Hourly Autopilot Job..."
           
-          echo "Starting Hourly Autopilot Job..."
+          # Generate 1 local reel
+          python3 autoreel.py --add-audio audio --output "temp_reel.mp4"
           
-          # 2. Run the process 5 times
-          for i in {1..5}; do
-            echo "--- Processing Reel $i/5 ---"
-            
-            # Generate local reel (outputs a random one with audio)
-            python3 autoreel.py --add-audio audio --output "temp_reel_$i.mp4"
-            
-            # Since my autoreel.py appends _audio.mp4, find the actual file
-            REAL_FILE=$(ls temp_reel_${i}*_audio.mp4 | head -n 1)
-            
-            if [ -f "$REAL_FILE" ]; then
-                # Upload to Supabase and get Public URL
-                export LOCAL_REEL="$REAL_FILE"
-                python3 -c "
+          # Find the actual file (autoreel.py appends timestamp and _audio.mp4)
+          REAL_FILE=$(ls temp_reel*_audio.mp4 | head -n 1)
+          
+          if [ -f "$REAL_FILE" ]; then
+              export LOCAL_REEL="$REAL_FILE"
+              python3 -c "
 import os
-from supabase_helper import upload_to_supabase
+from supabase_helper import upload_to_supabase, delete_from_supabase
 from upload_ig import upload_reel
 from autoreel import get_random_caption
 
@@ -66,19 +57,26 @@ upload_ig.IG_USER_ID = os.getenv('INSTAGRAM_USER_ID')
 
 local_file = os.getenv('LOCAL_REEL')
 caption = get_random_caption('captions.txt')
-print(f'[*] Using caption:\n{caption}')
 
+print(f'[*] Uploading to Supabase...')
 public_url = upload_to_supabase(local_file)
+
 if public_url:
-    upload_reel(public_url, caption)
-    # Cleanup Supabase
-    from supabase_helper import delete_from_supabase
+    print(f'[*] Uploading to Instagram...')
+    success = upload_reel(public_url, caption)
+    
+    # ALWAYS delete from Supabase after Instagram download attempt
+    print(f'[*] Cleaning up Supabase...')
     delete_from_supabase(os.path.basename(local_file))
+    
+    # Delete local file on GitHub runner (though runner is destroyed anyway)
+    if os.path.exists(local_file):
+        os.remove(local_file)
+        print(f'[+] Local file deleted.')
 "
-            fi
-            
-            # Small delay between uploads
-            sleep 30
-          done
+          else
+              echo "[!] No video file found to upload."
+              exit 1
+          fi
           
           echo "Autopilot cycle finished."
