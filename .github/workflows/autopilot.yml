@@ -2,7 +2,7 @@ name: 6-Hourly Reel Autopilot
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 2,7,10,14 * * *'  # 7am, 12pm, 3pm, 7pm UTC+5 (2,7,10,14 UTC)
   workflow_dispatch:
 
 jobs:
