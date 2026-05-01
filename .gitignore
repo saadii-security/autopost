@@ -13,3 +13,6 @@ output_reels/
 
 # Ignore system files
 .DS_Store
+
+# Ignore temporary quote tracking file
+.used_quote.txt

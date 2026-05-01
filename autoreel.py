@@ -106,6 +106,44 @@ QUOTES = [
 ]
 
 
+def _remove_quote_from_file(quote_text, path="qoutes.txt"):
+    """Remove a quote from the quotes file by matching its text content."""
+    if not os.path.exists(path):
+        print(f"Warning: quotes file not found: {path}", file=sys.stderr)
+        return False
+    
+    # Normalize the quote text for comparison (remove newlines, strip)
+    normalized_quote = quote_text.replace("\n", " ").strip().lower()
+    
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        lines = f.readlines()
+    
+    new_lines = []
+    removed = False
+    for line in lines:
+        # Extract quote text from line (handle "1. Quote" format)
+        test_line = line.strip()
+        if test_line and test_line[0].isdigit():
+            parts = test_line.split(".", 1)
+            if len(parts) == 2 and parts[0].strip().isdigit():
+                test_line = parts[1].strip()
+        
+        # Compare normalized text
+        if test_line.replace("\n", " ").strip().lower() == normalized_quote:
+            removed = True
+            continue  # Skip this line (remove it)
+        new_lines.append(line)
+    
+    if removed:
+        with open(path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+        print(f"[+] Removed quote from {path}: {quote_text[:50]}...")
+        return True
+    else:
+        print(f"[!] Quote not found in {path}: {quote_text[:50]}...", file=sys.stderr)
+        return False
+
+
 def _load_quotes_file(path):
     if not path:
         return []
@@ -573,8 +611,21 @@ def main():
             if os.path.exists(out) and os.path.exists(final_out):
                 os.remove(out)
             print(f"Done -> {final_out}")
+            # Save used quote for autopilot cleanup
+            _save_used_quote(q["text"])
+            return final_out, q["text"]
         else:
             print(f"Done -> {out}")
+            # Save used quote for autopilot cleanup
+            _save_used_quote(q["text"])
+            return out, q["text"]
+
+
+# Helper for autopilot: save used quote to a file for run_upload.py to consume
+def _save_used_quote(quote_text, path=".used_quote.txt"):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(quote_text)
+    _autoreel_debug(f"Saved used quote to {path}")
 
 
 if __name__ == "__main__":
