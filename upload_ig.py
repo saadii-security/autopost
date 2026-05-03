@@ -53,13 +53,18 @@ def upload_reel(video_url, caption=""):
         status = sres.get('status_code')
         
         if status == 'FINISHED':
-            print("[+] Processing finished.")
+            print("[SUCCESS] Video is ready for publishing.")
             break
         elif status == 'ERROR':
+            # NEW: Get detailed error message
+            error_details_url = f"https://graph.facebook.com/v19.0/{container_id}"
+            err_params = {'fields': 'status_code,status,error_message', 'access_token': ACCESS_TOKEN}
+            err_r = requests.get(error_details_url, params=err_params)
             print(f"[!] Processing failed: {sres}")
+            print(f"[!] Detailed Instagram Error: {err_r.json()}")
             return None
         else:
-            print(f"    - Current status: {status} (attempt {i+1}/30)")
+            print(f"    ... current status: {status} (attempt {i+1}/30)")
     
     # 3. Publish
     print("[*] Publishing reel...")
