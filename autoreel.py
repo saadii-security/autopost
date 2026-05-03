@@ -496,10 +496,12 @@ def merge_audio(video_path, audio_path, output_path, duration=8):
         "-t", str(duration),
         "-i", audio_path,
         "-i", video_path,
-        "-map", "0:a", "-map", "1:v",
+        "-map", "1:v:0", "-map", "0:a:0",
         "-c:v", "copy",
-        "-c:a", "aac", "-b:a", AAC_AUDIO_BITRATE, "-ar", "44100",
-        "-af", f"afade=t=out:st={duration-2}:d=2", # Fade out audio at the end
+        "-c:a", "aac", "-b:a", AAC_AUDIO_BITRATE, "-ar", "44100", "-ac", "2",
+        "-af", f"afade=t=out:st={duration-2}:d=2",
+        "-shortest",
+        "-map_metadata", "-1",
         output_path,
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
