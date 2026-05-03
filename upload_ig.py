@@ -56,12 +56,12 @@ def upload_reel(video_url, caption=""):
             print("[SUCCESS] Video is ready for publishing.")
             break
         elif status == 'ERROR':
-            # NEW: Get detailed error message
+            # Fix: Use fields that actually exist on a media container status check
             error_details_url = f"https://graph.facebook.com/v19.0/{container_id}"
-            err_params = {'fields': 'status_code,status,error_message', 'access_token': ACCESS_TOKEN}
+            err_params = {'fields': 'status_code,status', 'access_token': ACCESS_TOKEN}
             err_r = requests.get(error_details_url, params=err_params)
             print(f"[!] Processing failed: {sres}")
-            print(f"[!] Detailed Instagram Error: {err_r.json()}")
+            print(f"[!] Container Status: {err_r.json()}")
             return None
         else:
             print(f"    ... current status: {status} (attempt {i+1}/30)")

@@ -455,6 +455,9 @@ def generate_video(quote_text, author, theme, output_path):
         "-framerate", str(FPS),
         "-i", f"{tmp_dir}/f%05d.png",
         "-c:v", "libx264",
+        "-profile:v", "main",
+        "-level:v", "4.0",
+        "-bf", "0",
         "-pix_fmt", "yuv420p",
         "-crf", str(ENCODE_CRF),
         "-preset", ENCODE_PRESET,
@@ -494,7 +497,8 @@ def merge_audio(video_path, audio_path, output_path, duration=8):
         "-i", audio_path,
         "-i", video_path,
         "-map", "0:a", "-map", "1:v",
-        "-c:v", "copy", "-c:a", "aac", "-b:a", AAC_AUDIO_BITRATE,
+        "-c:v", "copy",
+        "-c:a", "aac", "-b:a", AAC_AUDIO_BITRATE, "-ar", "44100",
         "-af", f"afade=t=out:st={duration-2}:d=2", # Fade out audio at the end
         output_path,
     ]
