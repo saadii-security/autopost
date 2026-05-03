@@ -239,8 +239,8 @@ TOTAL_FRAMES   = DURATION * FPS
 
 # x264: grainy PNG sources + preset "fast" produced ~60MB+ for 8s; Supabase rejects large payloads.
 # Slower preset = better compression at the same CRF (same visual quality, smaller file).
-# CRF 20 + slow is typical for high-quality social vertical video and stays well under storage limits.
-ENCODE_CRF        = 20
+# CRF 28 is a good balance for social media (smaller file size, faster upload).
+ENCODE_CRF        = 28
 ENCODE_PRESET     = "slow"
 AAC_AUDIO_BITRATE = "128k"
 LINE_SPACING   = 92
