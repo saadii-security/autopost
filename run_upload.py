@@ -3,7 +3,6 @@ import sys
 import subprocess
 from supabase_helper import upload_to_supabase, delete_from_supabase
 from upload_ig import upload_reel
-from upload_youtube import upload_short, is_youtube_configured
 from autoreel import get_random_caption, _remove_quote_from_file
 
 # Update config with env vars
@@ -26,10 +25,7 @@ _dbg(
     f"SUPABASE_URL={'yes' if os.getenv('SUPABASE_URL') else 'no'}, "
     f"SUPABASE_KEY={'yes' if os.getenv('SUPABASE_KEY') else 'no'}, "
     f"INSTAGRAM_ACCESS_TOKEN={'yes' if os.getenv('INSTAGRAM_ACCESS_TOKEN') else 'no'}, "
-    f"INSTAGRAM_USER_ID={'yes' if os.getenv('INSTAGRAM_USER_ID') else 'no'}, "
-    f"YOUTUBE_REFRESH_TOKEN={'yes' if os.getenv('YOUTUBE_REFRESH_TOKEN') else 'no'}, "
-    f"GOOGLE_CLIENT_SECRET_JSON={'yes' if os.getenv('GOOGLE_CLIENT_SECRET_JSON') else 'no'}, "
-    f"youtube_configured={is_youtube_configured()}"
+    f"INSTAGRAM_USER_ID={'yes' if os.getenv('INSTAGRAM_USER_ID') else 'no'}"
 )
 
 caption = get_random_caption('captions.txt')
@@ -38,10 +34,6 @@ print(f"[*] Using caption:\n{caption}")
 
 if not local_file:
     print("[!] LOCAL_REEL is not set or empty", file=sys.stderr)
-    sys.exit(1)
-
-if not os.path.isfile(local_file):
-    print(f"[!] LOCAL_REEL file not found: {local_file}", file=sys.stderr)
     sys.exit(1)
 
 # Read the used quote from the file saved by autoreel.py
@@ -53,25 +45,12 @@ if os.path.exists(".used_quote.txt"):
 else:
     _dbg("No .used_quote.txt found")
 
-youtube_configured = is_youtube_configured()
-youtube_success = True
-
-if youtube_configured:
-    print("[*] Uploading to YouTube...")
-    youtube_success = bool(upload_short(local_file, caption, used_quote))
-elif os.environ.get("GITHUB_ACTIONS") == "true":
-    print(
-        "[!] YouTube not configured (need YOUTUBE_REFRESH_TOKEN + GOOGLE_CLIENT_SECRET_JSON). "
-        "Skipping YouTube; Instagram-only run.",
-        file=sys.stderr,
-    )
-
 print(f"[*] Uploading to Supabase...")
 public_url = upload_to_supabase(local_file)
 
 if public_url:
     print(f"[*] Uploading to Instagram...")
-    ig_success = upload_reel(public_url, caption)
+    success = upload_reel(public_url, caption)
 
     # ALWAYS delete from Supabase after Instagram download attempt
     print(f"[*] Cleaning up Supabase...")
@@ -83,8 +62,7 @@ if public_url:
         print(f"[+] Local file deleted.")
 
     # Remove used quote from qoutes.txt and commit to git
-    publish_ok = ig_success and youtube_success
-    if used_quote and publish_ok:
+    if used_quote and success:
         print(f"[*] Removing used quote from qoutes.txt...")
         if _remove_quote_from_file(used_quote, "qoutes.txt"):
             # Commit and push the change to git
@@ -105,15 +83,9 @@ if public_url:
             except subprocess.CalledProcessError as e:
                 print(f"[!] Git operation failed: {e}", file=sys.stderr)
 
-    if not ig_success:
+    if not success:
         print(
             "[!] Instagram Reel was not published. Check run logs above and your token.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    if youtube_configured and not youtube_success:
-        print(
-            "[!] YouTube upload failed. Check run logs and OAuth / API setup.",
             file=sys.stderr,
         )
         sys.exit(1)

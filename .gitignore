@@ -1,7 +1,6 @@
 # Security: Ignore local secrets
 .env
 client_secret*.json
-youtube_token.json
 
 # Ignore temp folders and caches
 .cache/
