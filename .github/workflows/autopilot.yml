@@ -30,7 +30,7 @@ jobs:
  
       - name: Install Python Dependencies
         run: |
-          pip install pillow numpy requests supabase
+          pip install -r requirements.txt
 
       - name: Generate and Upload 1 Reel
         env:
@@ -39,6 +39,8 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
           GIT_PAT: ${{ secrets.GIT_PAT }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
         run: |
           set -euxo pipefail
           echo "=== Autopilot: starting (pwd=$(pwd)) ==="
